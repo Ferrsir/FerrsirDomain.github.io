@@ -4,6 +4,12 @@ import {
   verifyKey,
 } from "discord-interactions";
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -14,6 +20,16 @@ const HEADERS = {
   Authorization: `Bearer ${SUPABASE_KEY}`,
   "Content-Type": "application/json",
 };
+
+async function readRawBody(req) {
+  const chunks = [];
+
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 async function getCount() {
   const response = await fetch(
@@ -54,62 +70,64 @@ async function setCount(newCount) {
 async function incrementCount(amount = 1) {
   const current = await getCount();
   const next = current + amount;
-  await setCount(next);
-  return next;
-}
 
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  await setCount(next);
+
+  return next;
 }
 
 function getOption(interaction, name) {
   return interaction.data?.options?.find((option) => option.name === name);
 }
 
-export default async function handler(request) {
-  if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+function sendDiscordResponse(res, body, status = 200) {
+  res.status(status).json(body);
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).send("Method not allowed");
   }
-
-  const signature = request.headers.get("x-signature-ed25519");
-  const timestamp = request.headers.get("x-signature-timestamp");
-  const rawBody = await request.text();
-
-  const isValid = verifyKey(rawBody, signature, timestamp, DISCORD_PUBLIC_KEY);
-
-  if (!isValid) {
-    return new Response("Bad request signature", { status: 401 });
-  }
-
-  const interaction = JSON.parse(rawBody);
-
-  if (interaction.type === InteractionType.PING) {
-    return jsonResponse({
-      type: InteractionResponseType.PONG,
-    });
-  }
-
-  if (interaction.type !== InteractionType.APPLICATION_COMMAND) {
-    return jsonResponse({
-      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-      data: {
-        content: "Unsupported interaction type.",
-      },
-    });
-  }
-
-  const commandName = interaction.data.name;
 
   try {
+    const signature = req.headers["x-signature-ed25519"];
+    const timestamp = req.headers["x-signature-timestamp"];
+    const rawBody = await readRawBody(req);
+
+    const isValid = verifyKey(
+      rawBody,
+      signature,
+      timestamp,
+      DISCORD_PUBLIC_KEY
+    );
+
+    if (!isValid) {
+      return res.status(401).send("Bad request signature");
+    }
+
+    const interaction = JSON.parse(rawBody);
+
+    if (interaction.type === InteractionType.PING) {
+      return sendDiscordResponse(res, {
+        type: InteractionResponseType.PONG,
+      });
+    }
+
+    if (interaction.type !== InteractionType.APPLICATION_COMMAND) {
+      return sendDiscordResponse(res, {
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: "Unsupported interaction type.",
+        },
+      });
+    }
+
+    const commandName = interaction.data.name;
+
     if (commandName === "counter") {
       const count = await getCount();
 
-      return jsonResponse({
+      return sendDiscordResponse(res, {
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: `Current Number of Times Riley has been a Tard:\n**${count}**`,
@@ -123,7 +141,7 @@ export default async function handler(request) {
 
       const newCount = await incrementCount(amount);
 
-      return jsonResponse({
+      return sendDiscordResponse(res, {
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: `Counter increased by ${amount}\nNew Count is **${newCount}**!`,
@@ -136,7 +154,7 @@ export default async function handler(request) {
       const amount = amountOption?.value;
 
       if (amount === undefined) {
-        return jsonResponse({
+        return sendDiscordResponse(res, {
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
             content: "You need to provide a number.",
@@ -147,7 +165,7 @@ export default async function handler(request) {
 
       const newCount = await setCount(amount);
 
-      return jsonResponse({
+      return sendDiscordResponse(res, {
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: `Counter set to\n${newCount}`,
@@ -158,7 +176,7 @@ export default async function handler(request) {
     if (commandName === "resetcounter") {
       const newCount = await setCount(0);
 
-      return jsonResponse({
+      return sendDiscordResponse(res, {
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: `Counter reset to\n${newCount}`,
@@ -166,7 +184,7 @@ export default async function handler(request) {
       });
     }
 
-    return jsonResponse({
+    return sendDiscordResponse(res, {
       type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
       data: {
         content: "Unknown command.",
@@ -175,7 +193,7 @@ export default async function handler(request) {
   } catch (error) {
     console.error(error);
 
-    return jsonResponse({
+    return sendDiscordResponse(res, {
       type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
       data: {
         content: "Something went wrong with the counter.",
