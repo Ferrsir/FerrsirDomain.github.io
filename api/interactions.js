@@ -140,7 +140,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Counter increased by ${amount}\nNew Count is **${newCount}**!`,
+          content: `Riley Dumbass Counter increased by ${amount}\nNew Count is **${newCount}**!`,
         },
       });
     }
@@ -164,7 +164,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Counter set to\n${newCount}`,
+          content: `Riley Dumb Ahh Loser Ahh Counter set to:\n**${newCount}**!`,
         },
       });
     }
@@ -175,7 +175,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Counter reset to\n${newCount}`,
+          content: `Counter reset to **${newCount}!**`,
         },
       });
     }
