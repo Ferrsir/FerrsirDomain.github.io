@@ -2,6 +2,9 @@
   "name": "riley-counter-slash-bot",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "register": "node register-commands.js"
+  },
   "dependencies": {
     "tweetnacl": "^1.0.3"
   }
