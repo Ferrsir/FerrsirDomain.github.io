@@ -5,7 +5,13 @@ const ROW_ID = process.env.ROW_ID || "1";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_ANNOUNCE_CHANNEL_ID = process.env.DISCORD_ANNOUNCE_CHANNEL_ID;
 
-const HEADERS = {
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+const SUPABASE_HEADERS = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
   "Content-Type": "application/json",
@@ -16,7 +22,7 @@ async function getCount() {
     `${SUPABASE_URL}/rest/v1/counter?idk=eq.${ROW_ID}&select=counter`,
     {
       method: "GET",
-      headers: HEADERS,
+      headers: SUPABASE_HEADERS,
     }
   );
 
@@ -34,7 +40,7 @@ async function setCount(newCount) {
     `${SUPABASE_URL}/rest/v1/counter?idk=eq.${ROW_ID}`,
     {
       method: "PATCH",
-      headers: HEADERS,
+      headers: SUPABASE_HEADERS,
       body: JSON.stringify({
         counter: newCount,
       }),
@@ -51,7 +57,7 @@ async function setCount(newCount) {
 
 async function sendDiscordMessage(amount, newCount) {
   if (!DISCORD_BOT_TOKEN || !DISCORD_ANNOUNCE_CHANNEL_ID) {
-    console.log("Missing Discord announce env variables.");
+    console.log("Missing Discord announce variables.");
     return;
   }
 
@@ -76,8 +82,17 @@ async function sendDiscordMessage(amount, newCount) {
 }
 
 export default async function handler(req, res) {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    res.setHeader(key, value);
+  }
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({
+      success: false,
       error: "Method not allowed",
     });
   }
