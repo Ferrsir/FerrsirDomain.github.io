@@ -6,6 +6,7 @@
     "register": "node register-commands.js"
   },
   "dependencies": {
+    "node-fetch": "^3.3.2",
     "tweetnacl": "^1.0.3"
   }
 }
