@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "discord-interactions": "^4.3.0"
+    "tweetnacl": "^1.0.3"
   }
 }
