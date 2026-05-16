@@ -111,7 +111,7 @@ function blockedResponse(res, interaction) {
   return res.status(200).json({
     type: 4,
     data: {
-      content: `<@${userId}> tried to change the counter but is blocked 💀`
+      content: `<@${userId}> tried to change the counter but is blacklisted 💀`
     }
   });
 }
