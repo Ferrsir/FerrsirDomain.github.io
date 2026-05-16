@@ -2,8 +2,8 @@ import nacl from "tweetnacl";
 
 export const config = {
   api: {
-    bodyParser: false,
-  },
+    bodyParser: false
+  }
 };
 
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
@@ -11,10 +11,15 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const ROW_ID = process.env.ROW_ID || "1";
 
-const HEADERS = {
+const BLOCKED_USER_IDS = (process.env.BLOCKED_USER_IDS || "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+const SUPABASE_HEADERS = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
+  "Content-Type": "application/json"
 };
 
 async function readRawBody(req) {
@@ -44,7 +49,7 @@ async function getCount() {
     `${SUPABASE_URL}/rest/v1/counter?idk=eq.${ROW_ID}&select=counter`,
     {
       method: "GET",
-      headers: HEADERS,
+      headers: SUPABASE_HEADERS
     }
   );
 
@@ -62,8 +67,10 @@ async function setCount(newCount) {
     `${SUPABASE_URL}/rest/v1/counter?idk=eq.${ROW_ID}`,
     {
       method: "PATCH",
-      headers: HEADERS,
-      body: JSON.stringify({ counter: newCount }),
+      headers: SUPABASE_HEADERS,
+      body: JSON.stringify({
+        counter: newCount
+      })
     }
   );
 
@@ -86,6 +93,27 @@ async function incrementCount(amount = 1) {
 
 function getOption(interaction, name) {
   return interaction.data?.options?.find((option) => option.name === name);
+}
+
+function getUserId(interaction) {
+  return interaction.member?.user?.id || interaction.user?.id;
+}
+
+function isBlockedUser(interaction) {
+  const userId = getUserId(interaction);
+
+  return BLOCKED_USER_IDS.includes(userId);
+}
+
+function blockedResponse(res, interaction) {
+  const userId = getUserId(interaction);
+
+  return res.status(200).json({
+    type: 4,
+    data: {
+      content: `<@${userId}> tried to change the counter but is blocked 💀`
+    }
+  });
 }
 
 export default async function handler(req, res) {
@@ -111,10 +139,10 @@ export default async function handler(req, res) {
 
     const interaction = JSON.parse(rawBody);
 
-    // Discord PING
+    // Discord endpoint verification ping
     if (interaction.type === 1) {
       return res.status(200).json({
-        type: 1,
+        type: 1
       });
     }
 
@@ -126,12 +154,16 @@ export default async function handler(req, res) {
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Current Number of Times Riley has been a Tard:\n**${count}**`,
-        },
+          content: `Current Number of Times Riley has been stupid:\n**${count}**`
+        }
       });
     }
 
     if (commandName === "addcounter") {
+      if (isBlockedUser(interaction)) {
+        return blockedResponse(res, interaction);
+      }
+
       const amountOption = getOption(interaction, "amount");
       const amount = amountOption?.value ?? 1;
 
@@ -140,12 +172,16 @@ export default async function handler(req, res) {
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Riley Dumbass Counter increased by ${amount}\nNew Count is **${newCount}**!`,
-        },
+          content: `Counter increased by ${amount}\nNew Count is **${newCount}**!`
+        }
       });
     }
 
     if (commandName === "setcounter") {
+      if (isBlockedUser(interaction)) {
+        return blockedResponse(res, interaction);
+      }
+
       const amountOption = getOption(interaction, "amount");
       const amount = amountOption?.value;
 
@@ -154,8 +190,8 @@ export default async function handler(req, res) {
           type: 4,
           data: {
             content: "You need to provide a number.",
-            flags: 64,
-          },
+            flags: 64
+          }
         });
       }
 
@@ -164,27 +200,31 @@ export default async function handler(req, res) {
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Riley Dumb Ahh Loser Ahh Counter set to:\n**${newCount}**!`,
-        },
+          content: `Counter set to\n${newCount}`
+        }
       });
     }
 
     if (commandName === "resetcounter") {
+      if (isBlockedUser(interaction)) {
+        return blockedResponse(res, interaction);
+      }
+
       const newCount = await setCount(0);
 
       return res.status(200).json({
         type: 4,
         data: {
-          content: `Counter reset to **${newCount}!**`,
-        },
+          content: `Counter reset to\n${newCount}`
+        }
       });
     }
 
     return res.status(200).json({
       type: 4,
       data: {
-        content: "Unknown command.",
-      },
+        content: "Unknown command."
+      }
     });
   } catch (error) {
     console.error("Function error:", error);
@@ -193,8 +233,8 @@ export default async function handler(req, res) {
       type: 4,
       data: {
         content: "Something went wrong with the counter.",
-        flags: 64,
-      },
+        flags: 64
+      }
     });
   }
 }
