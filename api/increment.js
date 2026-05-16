@@ -8,13 +8,13 @@ const DISCORD_ANNOUNCE_CHANNEL_ID = process.env.DISCORD_ANNOUNCE_CHANNEL_ID;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type"
 };
 
 const SUPABASE_HEADERS = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
+  "Content-Type": "application/json"
 };
 
 async function getCount() {
@@ -22,7 +22,7 @@ async function getCount() {
     `${SUPABASE_URL}/rest/v1/counter?idk=eq.${ROW_ID}&select=counter`,
     {
       method: "GET",
-      headers: SUPABASE_HEADERS,
+      headers: SUPABASE_HEADERS
     }
   );
 
@@ -42,8 +42,8 @@ async function setCount(newCount) {
       method: "PATCH",
       headers: SUPABASE_HEADERS,
       body: JSON.stringify({
-        counter: newCount,
-      }),
+        counter: newCount
+      })
     }
   );
 
@@ -56,9 +56,18 @@ async function setCount(newCount) {
 }
 
 async function sendDiscordMessage(amount, newCount) {
-  if (!DISCORD_BOT_TOKEN || !DISCORD_ANNOUNCE_CHANNEL_ID) {
-    console.log("Missing Discord announce variables.");
-    return;
+  if (!DISCORD_BOT_TOKEN) {
+    return {
+      sent: false,
+      error: "Missing DISCORD_BOT_TOKEN"
+    };
+  }
+
+  if (!DISCORD_ANNOUNCE_CHANNEL_ID) {
+    return {
+      sent: false,
+      error: "Missing DISCORD_ANNOUNCE_CHANNEL_ID"
+    };
   }
 
   const response = await fetch(
@@ -67,18 +76,29 @@ async function sendDiscordMessage(amount, newCount) {
       method: "POST",
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        content: `🌐 From website:\nCounter increased by ${amount}\nNew Count is **${newCount}**!`,
-      }),
+        content: `🌐 From website:\nCounter increased by ${amount}\nNew Count is **${newCount}**!`
+      })
     }
   );
 
+  const text = await response.text();
+
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Discord message error: ${text}`);
+    return {
+      sent: false,
+      status: response.status,
+      error: text
+    };
   }
+
+  return {
+    sent: true,
+    status: response.status,
+    response: text
+  };
 }
 
 export default async function handler(req, res) {
@@ -93,7 +113,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
-      error: "Method not allowed",
+      error: "Method not allowed"
     });
   }
 
@@ -104,18 +124,20 @@ export default async function handler(req, res) {
     const next = current + amount;
 
     await setCount(next);
-    await sendDiscordMessage(amount, next);
+
+    const discordResult = await sendDiscordMessage(amount, next);
 
     return res.status(200).json({
       success: true,
       counter: next,
+      discord: discordResult
     });
   } catch (error) {
     console.error(error);
 
     return res.status(500).json({
       success: false,
-      error: "Could not increment counter",
+      error: error.message
     });
   }
 }
